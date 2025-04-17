@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <button onclick="sendTest('A')">Send A</button>
+    <button onclick="sendTest('L')">Send L</button>
+    <div id="status">Not Connected</div>
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+        let statusDiv = document.getElementById('status');
+        let logDiv = document.getElementById('log');
+
+        function log(message) {
+            console.log(message);
+            logDiv.innerHTML = message + '<br>' + logDiv.innerHTML;
+        }
+
+        function connect() {
+            log("Attempting to connect...");
+            ws = new WebSocket('ws://localhost:8765');
+
+            ws.onopen = () => {
+                log("Connected!");
+                statusDiv.style.color = 'green';
+                statusDiv.textContent = 'Connected';
+            };
+
+            ws.onclose = () => {
+                log("Disconnected");
+                statusDiv.style.color = 'red';
+                statusDiv.textContent = 'Disconnected';
+                setTimeout(connect, 2000);
+            };
+
+            ws.onerror = (error) => {
+                log("Error: " + error);
+                statusDiv.style.color = 'red';
+                statusDiv.textContent = 'Error';
+            };
+
+            ws.onmessage = (event) => {
+                log("Received: " + event.data);
+            };
+        }
+
+        function sendTest(response) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = JSON.stringify({ response: response });
+                log("Sending: " + message);
+                ws.send(message);
+            } else {
+                log("Not connected!");
+            }
+        }
+
+        connect();
+    </script>
+</body>
+</html> 
