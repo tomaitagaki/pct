@@ -1,64 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebSocket Test</title>
+    <title>Probabilistic Categorization Task</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+        #instructionScreen {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            text-align: center;
+        }
+        #gameContainer {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #restartButton {
+            background-color: #f44336;
+        }
+        #restartButton:hover {
+            background-color: #da190b;
+        }
+        #startButton {
+            font-size: 20px;
+            padding: 15px 30px;
+        }
+    </style>
 </head>
 <body>
-    <h1>WebSocket Test</h1>
-    <button onclick="sendTest('A')">Send A</button>
-    <button onclick="sendTest('L')">Send L</button>
-    <div id="status">Not Connected</div>
-    <div id="log"></div>
+    <div id="instructionScreen">
+        <h1>Probabilistic Categorization Task</h1>
+        <div id="instructions">
+            <h2>Instructions</h2>
+            <p>In this task, you will see different shapes (▲, ■, ●) appear on the screen.</p>
+            <p>Your goal is to learn which category (A or L) each shape belongs to.</p>
+            <p>Press 'A' or 'L' on your keyboard to make your choice.</p>
+            <p>After each response, you'll receive feedback about whether you were correct.</p>
+            <p>Note that the same shape might belong to different categories at different times - try to learn the patterns!</p>
+        </div>
+        <button id="startButton">Start Task</button>
+    </div>
 
-    <script>
-        let ws = null;
-        let statusDiv = document.getElementById('status');
-        let logDiv = document.getElementById('log');
+    <div id="gameContainer">
+        <div id="sketch-holder"></div>
+        <button id="restartButton">Restart Task</button>
+    </div>
 
-        function log(message) {
-            console.log(message);
-            logDiv.innerHTML = message + '<br>' + logDiv.innerHTML;
-        }
-
-        function connect() {
-            log("Attempting to connect...");
-            ws = new WebSocket('ws://localhost:8765');
-
-            ws.onopen = () => {
-                log("Connected!");
-                statusDiv.style.color = 'green';
-                statusDiv.textContent = 'Connected';
-            };
-
-            ws.onclose = () => {
-                log("Disconnected");
-                statusDiv.style.color = 'red';
-                statusDiv.textContent = 'Disconnected';
-                setTimeout(connect, 2000);
-            };
-
-            ws.onerror = (error) => {
-                log("Error: " + error);
-                statusDiv.style.color = 'red';
-                statusDiv.textContent = 'Error';
-            };
-
-            ws.onmessage = (event) => {
-                log("Received: " + event.data);
-            };
-        }
-
-        function sendTest(response) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                const message = JSON.stringify({ response: response });
-                log("Sending: " + message);
-                ws.send(message);
-            } else {
-                log("Not connected!");
-            }
-        }
-
-        connect();
-    </script>
+    <!-- Load scripts at the end of body -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="sketch.js"></script>
 </body>
 </html> 

@@ -4,6 +4,25 @@ import time
 from datetime import datetime
 import os
 import pandas as pd
+import json
+import websockets
+import asyncio
+import argparse
+
+async def send_eeg_start_marker(eeg_start_time):
+    """Send EEG start time to marker server"""
+    uri = "ws://localhost:8765"
+    try:
+        async with websockets.connect(uri) as websocket:
+            marker_data = {
+                'timestamp': datetime.now().isoformat(),
+                'event_type': 'eeg_start',
+                'eeg_start_time': eeg_start_time
+            }
+            await websocket.send(json.dumps(marker_data))
+            print("Sent EEG start marker to server")
+    except Exception as e:
+        print(f"Warning: Could not send EEG start marker: {e}")
 
 def find_lsl_streams():
     """Find available LSL streams for OpenBCI and PCT"""
@@ -55,23 +74,35 @@ def find_lsl_streams():
     
     return openbci_stream, pct_stream
 
-def collect_data(duration=300, save_dir='data'):
-    """Collect data from both streams for specified duration
+def collect_data(duration=None, file_name=None):
+    """Collect EEG data for specified duration
     
     Args:
         duration: Recording duration in seconds
-        save_dir: Directory to save the data
+        file_name: Custom file name for output files (no extension)
     """
+    # Create data directory
+    save_dir = 'data'
     os.makedirs(save_dir, exist_ok=True)
     
-    openbci_stream, pct_stream = find_lsl_streams()
+    # Create timestamp for this session
+    if file_name:
+        base_name = file_name
+    else:
+        base_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Initialize files
+    eeg_data = []
+    eeg_timestamps = []
+    csv_path = os.path.join(save_dir, f'markers_{base_name}.csv')
+    
+    openbci_stream, _ = find_lsl_streams()  # Still check for marker stream to ensure system is ready
     
     openbci_inlet = pylsl.StreamInlet(
         openbci_stream,
         max_buflen=360,  
         max_chunklen=12
     )
-    pct_inlet = pylsl.StreamInlet(pct_stream)
     
     openbci_info = openbci_inlet.info()
     print("\nOpenBCI Stream Info:")
@@ -85,30 +116,22 @@ def collect_data(duration=300, save_dir='data'):
     test_sample, test_timestamp = openbci_inlet.pull_sample(timeout=5.0)
     if test_sample is None:
         print("WARNING: Could not get initial sample from OpenBCI. Check if data is being sent.")
+        return
     else:
         print(f"Successfully received test sample: shape={len(test_sample)}")
     
-    eeg_data = []
-    eeg_timestamps = []
-    if test_sample is not None:
-        eeg_data.append(test_sample)
-        eeg_timestamps.append(test_timestamp)
+    # Send EEG start marker
+    asyncio.run(send_eeg_start_marker(time.time()))
     
-    markers = []
-    marker_timestamps = []
-    
-    print(f"\nRecording for {duration} seconds...")
-    start_time = time.time()
     last_sample_time = time.time()
     sample_timeout_count = 0
     
     try:
-        total_samples = len(eeg_data)
-        total_markers = 0
+        total_samples = 0
         last_print_time = time.time()
         print_interval = 5.0 
         
-        while time.time() - start_time < duration:
+        while time.time() - last_sample_time < duration if duration else True:
             samples, timestamps = openbci_inlet.pull_chunk(timeout=0.0)
             current_time = time.time()
             
@@ -124,22 +147,13 @@ def collect_data(duration=300, save_dir='data'):
                     if sample_timeout_count == 1:  # Only print once
                         print("\nWARNING: No EEG samples received for 1 second. Check OpenBCI stream.")
             
-            # Get markers
-            marker, marker_time = pct_inlet.pull_sample(timeout=0.0)
-            if marker:
-                markers.append(marker[0])
-                marker_timestamps.append(marker_time)
-                total_markers += 1
-                print(f"\nNew marker received: {marker[0]} at time {marker_time:.3f}")
-            
             # Print stats periodically
             if current_time - last_print_time >= print_interval:
-                elapsed = current_time - start_time
+                elapsed = current_time - last_sample_time
                 sample_rate = total_samples/elapsed if elapsed > 0 else 0
-                print(f"\rRecording: {int(elapsed)}/{duration}s | "
+                print(f"\rRecording: {int(elapsed)}s | "
                       f"Samples: {total_samples} ({sample_rate:.1f}/s | "
-                      f"Expected: {openbci_info.nominal_srate():.1f}/s) | "
-                      f"Markers: {total_markers}", end='')
+                      f"Expected: {openbci_info.nominal_srate():.1f}/s)", end='')
                 last_print_time = current_time
     
     except KeyboardInterrupt:
@@ -153,30 +167,18 @@ def collect_data(duration=300, save_dir='data'):
         eeg_data = np.array(eeg_data)
         eeg_timestamps = np.array(eeg_timestamps)
         
-        # Save data
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
         # Save EEG data
-        np.save(os.path.join(save_dir, f'eeg_data_{timestamp}.npy'), eeg_data)
-        np.save(os.path.join(save_dir, f'timestamps_{timestamp}.npy'), eeg_timestamps)
-        
-        # Save markers
-        marker_df = pd.DataFrame({
-            'timestamp': marker_timestamps,
-            'response': markers
-        })
-        marker_df.to_csv(os.path.join(save_dir, f'markers_{timestamp}.csv'), index=False)
+        np.save(os.path.join(save_dir, f'eeg_data_{base_name}.npy'), eeg_data)
+        np.save(os.path.join(save_dir, f'timestamps_{base_name}.npy'), eeg_timestamps)
         
         print(f"\nData saved:")
         print(f"EEG data shape: {eeg_data.shape}")
-        print(f"Number of markers: {len(markers)}")
-        print(f"Files saved with timestamp: {timestamp}")
+        print(f"Files saved with base name: {base_name}")
 
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--duration', type=int, default=300, help='Recording duration in seconds')
-    parser.add_argument('--save-dir', type=str, default='data', help='Directory to save data')
+    parser.add_argument('--duration', type=int, default=None, help='Recording duration in seconds (default: infinite)')
+    parser.add_argument('--file_name', type=str, default=None, help='Custom file name for output files (no extension)')
     args = parser.parse_args()
     
-    collect_data(duration=args.duration, save_dir=args.save_dir) 
+    collect_data(duration=args.duration, file_name=args.file_name) 

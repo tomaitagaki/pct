@@ -1,13 +1,53 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adaptive Learning Task</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <title>PCT Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+    </style>
 </head>
 <body>
-    <script src="sketch.js?v=1"></script>
+    <div id="instructionScreen">
+        <h1>PCT Test</h1>
+        <button id="startButton">Start</button>
+    </div>
+
+    <div id="gameContainer">
+        <div id="sketch-holder"></div>
+        <button id="restartButton">Restart</button>
+    </div>
+
+    <script>
+        // Debug script to check DOM loading
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded fired');
+            const elements = {
+                instructionScreen: document.getElementById('instructionScreen'),
+                gameContainer: document.getElementById('gameContainer'),
+                startButton: document.getElementById('startButton'),
+                restartButton: document.getElementById('restartButton'),
+                sketchHolder: document.getElementById('sketch-holder')
+            };
+            
+            console.log('Elements found:', {
+                instructionScreen: !!elements.instructionScreen,
+                gameContainer: !!elements.gameContainer,
+                startButton: !!elements.startButton,
+                restartButton: !!elements.restartButton,
+                sketchHolder: !!elements.sketchHolder
+            });
+        });
+    </script>
+    
+    <!-- Load p5.js and sketch.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="sketch.js"></script>
 </body>
 </html>
